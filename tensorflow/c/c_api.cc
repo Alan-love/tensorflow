@@ -154,6 +154,18 @@ void TF_DeleteBuffer(TF_Buffer* buffer) {
 
 TF_Buffer TF_GetBuffer(TF_Buffer* buffer) { return *buffer; }
 
+void TF_TensorFromProto(const TF_Buffer* from, TF_Tensor* to,
+                        TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
+  tensorflow::TensorProto from_tensor_proto;
+  status->status = BufferToMessage(from, &from_tensor_proto);
+  if (!status->status.ok()) {
+    return;
+  }
+  status->status =
+      tensorflow::down_cast<tensorflow::TensorInterface*>(to->tensor)
+          ->FromProto(from_tensor_proto);
+}
 // --------------------------------------------------------------------------
 
 TF_DeprecatedSession* TF_NewDeprecatedSession(const TF_SessionOptions* opt,
@@ -782,9 +794,9 @@ void TF_GraphGetTensorShape(TF_Graph* graph, TF_Output output, int64_t* dims,
 
 extern "C" {
 
-static TF_OperationDescription* TF_NewOperationLocked(TF_Graph* graph,
-                                                      const char* op_type,
-                                                      const char* oper_name)
+TF_OperationDescription* TF_NewOperationLocked(TF_Graph* graph,
+                                               const char* op_type,
+                                               const char* oper_name)
     TF_EXCLUSIVE_LOCKS_REQUIRED(graph->mu) {
   return new TF_OperationDescription(graph, op_type, oper_name);
 }
@@ -1041,8 +1053,8 @@ void TF_SetAttrValueProto(TF_OperationDescription* desc, const char* attr_name,
   status->status = Status::OK();
 }
 
-static TF_Operation* TF_FinishOperationLocked(TF_OperationDescription* desc,
-                                              TF_Status* status)
+TF_Operation* TF_FinishOperationLocked(TF_OperationDescription* desc,
+                                       TF_Status* status)
     TF_EXCLUSIVE_LOCKS_REQUIRED(desc->graph->mu) {
   Node* ret = nullptr;
 
